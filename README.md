@@ -1,2 +1,9 @@
-# Procesos_Estocasticos
-Algunas de las actividades evaluativas entregadas en el curso Teoría de Procesos Estocásticos de la Universidad Nacional de Colombia
+# Teoría de Procesos Estocásticos (2023-I)
+
+En este repositorio se encontrarán algunas de las soluciones propuestas para algunas de las actividades evaluativas propuestas en el curso dirigido por el docente :
+  - Parcial 1. Parte práctica.
+  - Parcial 2. Parte práctica.
+  - Parcial 3. Parte práctica.
+  - Proyecto del curso.
+
+El curso estuvo a cargo del docente **Viswanathan Arunachalam**.
