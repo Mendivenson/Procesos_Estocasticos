@@ -6,4 +6,4 @@ En este repositorio se encontrarán algunas de las soluciones propuestas para al
   - Parcial 3. Parte práctica.
   - Proyecto del curso.
 
-El curso estuvo a cargo del docente **Viswanathan Arunachalam**.
+El curso estuvo a cargo del docente **[Viswanathan Arunachalam](https://sites.google.com/view/varunachalam/home?authuser=0)**.
