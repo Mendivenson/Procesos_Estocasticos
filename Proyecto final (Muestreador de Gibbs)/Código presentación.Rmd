@@ -1,0 +1,322 @@
+---
+title: "Muestreador de Gibbs"
+author: 
+  - name: "[Michel Mendivenson Barragán Zabala](mbarraganz@unal.edu.co)"
+date: "23 de Junio de 2023"
+output: 
+  ioslides_presentation:
+    widescreen: true
+    smaller: false
+    transition: 0
+    slide_level: 3
+    css: custom.css
+  toc: true
+subtitle: 'Una primera aproximación'
+---
+
+
+# Introducción 
+
+
+---  
+Si bien en la vida real es posible encontrarnos con distribuciones de probabilidad sobre las que podemos obtener muestras de forma sencilla se debe decir que este caso es muchísimo menos frecuente que el caso en el que necesitamos lidiar con distribuciones de probabilidad un poco más complejas para las cuales nos es díficil muestrear directamente. Aquí es donde destacan los métodos [MCMC (Markov chain Monte Carlo)](https://en.wikipedia.org/wiki/Markov_chain_Monte_Carlo). Dentro de ellos uno de los métodos más sencillos de implementar y el que, casi siempre, se usa para una primera aproximación a estos métodos es el muestreador de Gibbs.
+---
+
+# Problema
+
+
+------
+Aunque el siguiente problema no representa algo típico en la vida real, es un problema que nos permite entender de una forma más amigable el funcionamiento del muestreador de Gibbs. Además tenga el cuenta que el problema está hecho a priori para que el muestreador funcione a la perfección 
+------
+
+
+###
+Se tienen dos monedas: una justa y una trucada con probabilidad $\scriptsize{3/4}$ de obtener cara y $\scriptsize{1/4}$ de obtener un sello al lanzarla y se plantea el sistema de juego en los siguientes pasos.
+
+1. El jugador del primer turno escoge si desea iniciar con la moneda trucada o con la moneda justa (Obligando a que el otro jugador inicie con la moneda que este no escogió).
+2. Cada jugador hace dos lanzamientos por turno.
+3. Se sigue el siguiente sistema de decisión luego del primer lanzamiento independientemente de la moneda con que se efectuase:
+    + Si se obtiene cara, el segundo tiro se efectúa nuevamente con la moneda justa.
+    + Si se obtiene sello, el segundo tiro se efectuará con la moneda trucada.
+4. Luego del segundo lanzamiento se sigue un sistema similar:
+    + Si se obtiene sello, para el primer tiro de la siguiente ronda se tira con la moneda justa.
+    + Si se obtiene sello se lanza con la moneda trucada.
+  
+###
+Note que si definimos que $\scriptsize{0 = Cara}$ y $\scriptsize{1 = Sello}$ y a las variables aleatorias $\scriptsize{X = \text{"Primer lanzamiento de una ronda"}}$ e $\scriptsize{Y = \text{"Segundo lanzamiento en una ronda"}}$ tendremos las siguientes probabilidades condicionales:
+
+- $\scriptsize{P(Y_n = 0 | X_n = 0) = 1/2}$
+- $\scriptsize{P(Y_n = 1 | X_n = 0) = 1/2}$
+
+- $\scriptsize{P(Y_n = 0 | X_n = 1) = 3/4}$
+- $\scriptsize{P(Y_n = 1 | X_n = 1) = 1/4}$
+
+- $\scriptsize{P(X_n = 0 | Y_n = 0) = 3/4}$
+- $\scriptsize{P(X_n = 1 | Y_n = 0) = 1/4}$
+
+- $\scriptsize{P(X_n = 0 | Y_n = 1) = 1/2}$
+- $\scriptsize{P(X_n = 1 | Y_n = 1) = 1/2}$
+
+# Implementación general del algoritmo
+
+---
+El muestreador de Gibbs es un caso específico del algoritmo de Metropolis-Hasting que necesita conocer la distribución condicional de todas las variables aleatorias entre sí pero que con esa información nos puede dar aproximaciones a la distribución tanto conjunta como las marginales de cada variablen este caso específico no parece algo díficil de lograr simplemente a mano. Sin embargo, este algoritmo suele usarse para casos en os que hay más variables implicadas (Estadística Bayesiana).
+---
+
+###
+<img align="center" src="/home/mendi/Downloads/Diagrama.png">
+
+
+## Algoritmo 
+
+###
+```{r UnaMuestraDeGibbs}
+muestraG = c()
+# Orden del vector de probabilidades dado x = 0: P(Y=0|X=0),P(Y=1,X=0)
+x0 = c(0.5,0.5) # Vector de probabilidades para Y dado X=0
+x1 = c(0.75,0.25) # Vector de probabilidades para Y dado X=1
+
+y0 = c(0.75,0.25) # Vector de probabilidades para X dado Y=0
+y1 = c(0.5,0.5) # Vector de probabilidades para X dado Y=1
+x = sample(c(0,1),size=1,prob=c(0.75,0.25))
+
+# Es posible que experimente lentitud al correr el siguiente algoritmo.
+for (i in 1:100000){
+  if (x == 0){
+    proba = x0
+  } else {
+    proba = x1
+  }
+  y = sample(c(0,1),size=1,prob=proba)
+  muestraG = rbind(muestraG,c(x,y))
+  if (y == 0){
+    proba = y0
+  } else {
+    proba = y1
+  }
+  x = sample(c(0,1),size=1,prob=proba)
+}
+```
+
+
+###
+**Primera llegada al evento $\scriptsize{X_n = 0, X_{n+1} = 0}$ para 10000 muestras**
+
+```{r 10000MuestrasPrimerasLlegadas,fig.show="hold", out.width="70%",echo = FALSE}
+#Vector para guardar cúanto tardó en llegar el muestreador
+CasoTruncado <- c() 
+
+#Vector para guardar cúanto tardó en cumplirse la condición en el caso justo
+CasoJusto <- c()
+for (i in 1:10000){
+  # Iniciamos el caso truncado
+  x = sample(c(0,1),size=1,prob=c(0.5,0.5)) 
+  Counter = 1
+  xm1 = 2
+  while (!((x == 0) && (x == xm1))){
+    if (Counter != 1){x=xm1}
+    if (xm1 == 0){
+      proba = x0
+    } else {
+      proba = x1
+    }
+    y = sample(c(0,1),size=1,prob=proba)
+    if (y == 0){
+      proba = y0
+    } else {
+      proba = y1
+    }
+    xm1 = sample(c(0,1),size=1,prob=proba)
+    Counter = Counter+1
+  }
+  CasoJusto<- c(CasoJusto,Counter)
+  
+  # Iniciamos el caso truncado
+  x = sample(c(0,1),size=1,prob=c(0.75,0.25)) 
+  Counter = 1
+  xm1 = 2
+  while (!((x == 0) && (x == xm1))){
+    if (Counter != 1){x=xm1}
+    if (xm1 == 0){
+      proba = x0
+    } else {
+      proba = x1
+    }
+    y = sample(c(0,1),size=1,prob=proba)
+    if (y == 0){
+      proba = y0
+    } else {
+      proba = y1
+    }
+    xm1 = sample(c(0,1),size=1,prob=proba)
+    Counter = Counter+1
+  }
+  CasoTruncado <- c(CasoTruncado,Counter)
+}
+
+hist(CasoJusto,prob=T,
+     main = 'Histograma tiempo de primer visita',
+     breaks = 15,
+     ylab='Frecuencia',
+     xlab='Valor')
+mtext(line=0.6, 'al evento X_n = 1 = X_n+1',cex=0.85)
+```
+```{r, echo=FALSE}
+print(paste('La media de los tiempos para el caso de la moneda justa fue:',mean(CasoJusto)))
+```
+
+###
+**Primera llegada al evento $\scriptsize{Y_n = 0, Y_{n+1} = 0}$ para 10000 muestras**
+```{r HISTOGRAMA1,fig.show="hold", out.width="70%",echo = FALSE}
+hist(CasoJusto,prob=T,
+     main = 'Histograma tiempo de primer visita',
+     breaks = 15,
+     ylab='Frecuencia',
+     xlab='Valor')
+mtext(line=0.6, 'al evento Y_n = 1 = Y_n+1',cex=0.85)
+```
+
+```{r, echo =FALSE}
+print(paste('La media de los tiempos para el caso de la moneda truncada fue:',mean(CasoTruncado)))
+```
+
+
+###
+***Primera llegada al evento ${\scriptsize{(X_n = 0, Y_n = 0)}}$ con 10000 muestras***
+
+```{r MarkovConjunta, ,fig.show="hold", out.width="70%",echo = FALSE}
+#Vector para guardar cúanto tardó en llegar el muestreador
+Caso <- c() 
+for (i in 1:10000){
+  # Iniciamos el caso truncado
+  x = sample(c(0,1),size=1,prob=c(0.5,0.5)) 
+  Counter = 1
+  y = 2
+  while (!((xm1 == 0) && (y == 0))){
+    if (Counter != 1){x=xm1}
+    if (x == 0){
+      proba = x0
+    } else {
+      proba = x1
+    }
+    y = sample(c(0,1),size=1,prob=proba)
+    if (y == 0){
+      proba = y0
+    } else {
+      proba = y1
+    }
+    xm1 = sample(c(0,1),size=1,prob=proba)
+    Counter = Counter+1
+  }
+  Caso<- c(Caso,Counter)
+}
+
+
+hist(Caso,prob=T,
+     main = 'Histograma tiempo de primer visita',
+     breaks = 15,
+     ylab='Frecuencia',
+     xlab='Valor')
+mtext(line=0.6, 'al evento (X_n=0 ,Y_n=0)',cex=0.85)
+```
+
+```{r, echo=FALSE}
+print(paste('La media de los tiempos de primer llegada al evento (0,0) fue:',mean(Caso)))
+```
+## ¿Por qué este algoritmo funciona?
+
+---
+Se puede comprobar (Y no es tan complejo de hacer al menos para este caso) que el algoritmo debe tender a la distribución conjunta de las variables aleatorias y que además también individualmente debe tender a las distribuciones marginales de las variables.
+---
+
+###
+Veáse [Explaining the Gibbs Sampler by George Casella](http://links.jstor.org/sici?sici=0003-1305%28199208%2946%3A3%3C167%3AETGS%3E2.0.CO%3B2-R) para una revisión de la prueba de convergencia para el caso de dos Bernoulli del muestreador de Gibbs (Este caso) y otros detalles respecto al muestreador de Gibbs. En este paper se comprueba que si consignamos las probabilidades de transición en dos matrices separadas de la siguiente forma:
+
+$$
+A_{_{Y|X}}=
+\begin{bmatrix}
+ 1/2&1/2\\
+ 3/4&1/4\\
+\end{bmatrix}$$y$$
+A_{_{X|Y}}=
+\begin{bmatrix}
+3/4&1/4\\
+1/2& 1/2\\
+\end{bmatrix}
+$$ entonces tendremos que la distribución marginal de $\scriptsize{X}$ es uno de los vectores solución del sistema $\scriptsize{\pi A_{_{Y|X}}A_{_{X|Y}} = \pi}$ y del mismo modo para $\scriptsize{Y}$ es una de las soluciones del sistema $\scriptsize{\alpha A_{_{X|Y}}A_{_{Y|X}} = \alpha}$
+
+Veamos primero el caso de la distribución marginal $f_{_X}$. Es una de las soluciones al sistema:
+
+$$
+\pi \begin{bmatrix}
+ 5/8&3/8\\
+ 11/16&5/16\\
+\end{bmatrix} = \pi
+$$
+que además cumple la propiedad de que sus componentes suman cero. Así $\scriptsize{f_{_{X}} = \left(\frac{6}{17},\frac{11}{17}\right)}$ y en el caso de $f_{_Y}$ se tendrá que es una de las soluciones al sistema 
+
+$$
+\alpha \begin{bmatrix}
+ 9/16&7/16\\
+ 5/8&3/8\\
+\end{bmatrix} = \alpha
+$$
+
+es decir $\scriptsize{f_{_Y} = \left(\frac{7}{17},\frac{10}{17}\right)}$ y una vez halladas estas distribuciones marginales es sencillo encontrar la distribución conjunta usando las probabilidades condicionales dadas por el ejercicio.
+
+
+## Las distribuciones marginales y conjuntas.
+
+###
+Uno de los principales usos de la distribución de Gibbs es muestrear distribuciones conjuntas para las cuales es díficil hallarla usando métodos analíticos o otro tipo de métodos de simulación. Con una muestra de 100000 de la secuencia del muestreador de Gibbs obtenemos uns distribucionales marginales para X:
+```{r,echo=FALSE}
+library(knitr)
+muestraG = c()
+x = sample(c(0,1),size=1,prob=c(0.75,0.25))
+# Es posible que experimente lentitud al correr el siguiente algoritmo.
+for (i in 1:100000){
+  if (x == 0){
+    proba = x0
+  } else {
+    proba = x1
+  }
+  y = sample(c(0,1),size=1,prob=proba)
+  muestraG = rbind(muestraG,c(x,y))
+  if (y == 0){
+    proba = y0
+  } else {
+    proba = y1
+  }
+  x = sample(c(0,1),size=1,prob=proba)
+}
+
+matriz <- matrix(c("Cara",mean(muestraG[,1]),"Sello",1-mean(muestraG[,1])),ncol = 2)
+kable(t(matriz))
+```
+Y para Y:
+```{r echo=FALSE}
+matriz2 <- matrix(c("Cara",mean(muestraG[,2]),"Sello",1-mean(muestraG[,2])),ncol = 2)
+kable(t(matriz2))
+```
+
+En cuanto a la distribución conjunta se obtiene lo siguiente:
+
+```{r,echo=FALSE}
+CaraCara <- sum(muestraG[, 1] == 0 & muestraG[, 2] == 0)
+CaraSello <- sum(muestraG[, 1] == 0 & muestraG[, 2] == 1)  
+SelloCara <-  sum(muestraG[, 1] == 1 & muestraG[, 2] == 0)
+SelloSello <- sum(muestraG[, 1] == 1 & muestraG[, 2] == 1)
+
+matriz3 <- matrix(c('Cara-Cara',CaraCara/100000,'Cara-Sello',CaraSello/100000,'Sello-Cara',SelloCara/100000,'Sello-Sello',SelloSello/100000),ncol=4)
+kable(t(matriz3))
+```
+
+
+## Bibliografía
+
+###
++ Casella, G., & George, E. I. (1992). Explaining the Gibbs sampler. The American statistician, 46(3), 167. https://doi.org/10.2307/2685208
++ Chapter 6: Gibbs sampling. (s/f). Github.io. Recuperado el 23 de junio de 2023, de https://jwmi.github.io/BMS/chapter6-gibbs-sampling.pdf
++ Gibbs sampling example using a discrete distribution. (2018, octubre 26). James D. McCaffrey. https://jamesmccaffrey.wordpress.com/2018/10/26/gibbs-sampling-example-using-a-discrete-distribution/
++ Kass, R. E., Carlin, B. P., Gelman, A., & Neal, R. M. (1998). Markov chain Monte Carlo in practice: A roundtable discussion. The American Statistician, 52(2), 93–100. https://doi.org/10.1080/00031305.1998.10480547
++ Reversible Markov Chains. (s/f). Berkeley.edu. Recuperado el 23 de junio de 2023, de https://inst.eecs.berkeley.edu/~ee126/sp18/reversibility.pdf
